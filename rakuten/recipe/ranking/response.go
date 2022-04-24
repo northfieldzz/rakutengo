@@ -1,4 +1,6 @@
-package recipe
+package ranking
+
+import rakuten "github.com/northfieldzz/rakutengo"
 
 type Recipe struct {
 	Id             string   `json:"recipeId"`
@@ -16,4 +18,13 @@ type Recipe struct {
 	FoodImageUrl   string   `json:"foodImageUrl"`
 	SmallImageUrl  string   `json:"smallImageUrl"`
 	MediumImageUrl string   `json:"mediumImageUrl"`
+}
+
+type Data struct {
+	Result []Recipe `json:"result"`
+}
+
+type Result struct {
+	Data  *Data
+	Error *rakuten.ErrorResponse
 }

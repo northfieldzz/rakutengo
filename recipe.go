@@ -3,13 +3,19 @@ package rakuten
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/northfieldzz/rakutengo/rakuten/recipe"
+	"github.com/northfieldzz/rakutengo/rakuten/recipe/category"
+	"github.com/northfieldzz/rakutengo/rakuten/recipe/ranking"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+)
+
+const (
+	categoriesPath = "Recipe/CategoryList/20170426"
+	rankingPath    = "Recipe/CategoryRanking/20170426"
 )
 
 func (r *Rakuten) SetQuery(path string, values map[string]string) {
@@ -23,62 +29,70 @@ func (r *Rakuten) SetQuery(path string, values map[string]string) {
 	u.RawQuery = q.Encode()
 }
 
-func (r *Rakuten) FetchCategories() {
-	path := "Recipe/CategoryList/20170426"
-	r.SetQuery(path, map[string]string{"formatVersion": "2"})
+func (r *Rakuten) FetchCategories() (result *category.Result, err error) {
+	r.SetQuery(categoriesPath, map[string]string{"formatVersion": "2"})
 	client := &http.Client{}
-	request, err := http.NewRequest(
+	var request *http.Request
+	if request, err = http.NewRequest(
 		"GET",
 		r.url.String(),
 		strings.NewReader(url.Values{}.Encode()),
-	)
-	response, err := client.Do(request)
+	); err != nil {
+		return nil, err
+	}
+	var response *http.Response
+	if response, err = client.Do(request); err != nil {
+		return nil, err
+	}
 	defer func(body io.ReadCloser) {
 		err := body.Close()
 		if err != nil {
 			return
 		}
 	}(response.Body)
-	if response.StatusCode != 200 {
+	var body []byte
+	if body, err = ioutil.ReadAll(response.Body); err != nil {
+		return nil, err
+	}
+	if response.StatusCode == 200 {
 		//sample, _ := ioutil.ReadAll(response.Body)
-		return
-	}
-	if err != nil {
-		return
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return
-	}
-
-	var d recipe.Category
-	err = json.Unmarshal(body, &d)
-	if err != nil {
-		return
+		var d category.Data
+		if err := json.Unmarshal(body, &d); err != nil {
+			return nil, err
+		}
+		return &category.Result{
+			Data:  &d,
+			Error: nil,
+		}, nil
+	} else {
+		var d ErrorResponse
+		if err := json.Unmarshal(body, &d); err != nil {
+			return nil, err
+		}
+		return &category.Result{
+			Data:  nil,
+			Error: &d,
+		}, nil
 	}
 }
 
-func (r *Rakuten) FetchRecipeRanking(categoryId string) {
-	path := "Recipe/CategoryRanking/20170426"
-	u := r.url
-	u.Path = fmt.Sprintf("services/api/%s", path)
-	q := u.Query()
-	q.Set("applicationId", os.Getenv("RAKUTEN_APPLICATION_ID"))
-	q.Set("formatVersion", "2")
-	u.RawQuery = q.Encode()
+func (r *Rakuten) FetchRecipeRanking(categoryId string) (result *ranking.Result, err error) {
+	r.SetQuery(rankingPath, map[string]string{
+		"formatVersion": "2",
+		"categoryId":    categoryId,
+	})
 	client := &http.Client{}
-	request, err := http.NewRequest(
+	var request *http.Request
+	if request, err = http.NewRequest(
 		"GET",
-		u.String(),
+		r.url.String(),
 		strings.NewReader(url.Values{}.Encode()),
-	)
-	response, err := client.Do(request)
-	if response.StatusCode != 200 {
-		return
+	); err != nil {
+		return nil, err
 	}
-	if err != nil {
-		return
+	var response *http.Response
+	if response, err = client.Do(request); err != nil {
+		return nil, err
 	}
 	defer func(body io.ReadCloser) {
 		err := body.Close()
@@ -86,15 +100,28 @@ func (r *Rakuten) FetchRecipeRanking(categoryId string) {
 			return
 		}
 	}(response.Body)
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return
+	var body []byte
+	if body, err = ioutil.ReadAll(response.Body); err != nil {
+		return nil, err
 	}
 
-	var d recipe.RankingResponse
-	err = json.Unmarshal(body, &d)
-	if err != nil {
-		return
+	if response.StatusCode == 200 {
+		var d ranking.Data
+		if err := json.Unmarshal(body, &d); err != nil {
+			return nil, err
+		}
+		return &ranking.Result{
+			Data:  &d,
+			Error: nil,
+		}, nil
+	} else {
+		var d ErrorResponse
+		if err := json.Unmarshal(body, &d); err != nil {
+			return nil, err
+		}
+		return &ranking.Result{
+			Data:  nil,
+			Error: &d,
+		}, nil
 	}
 }
